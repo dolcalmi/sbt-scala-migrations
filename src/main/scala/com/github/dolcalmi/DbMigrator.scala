@@ -1,5 +1,9 @@
 package com.github.dolcalmi
 
+import java.io.PrintWriter
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 import com.imageworks.migration.{Migrator, DatabaseAdapter, Vendor, ConnectionBuilder}
 
 import com.typesafe.config.ConfigFactory
@@ -11,11 +15,10 @@ class DbMigrator(configFile: File, logger: Logger) {
 
   logger.info(s"Loading config file: $configFile for environment: $env")
 
-  val config = ConfigFactory.parseFile(configFile).resolve().getConfig(env)
-  val migrationsConfig = config.getConfig("migrations")
+  val migrationsConfig = ConfigFactory.parseFile(configFile).resolve().getConfig(env)
 
-  val migrationsPackage = migrationsConfig.getConfig("package")
-  val migrationsDir = migrationsConfig.getConfig("directory")
+  val migrationsPackage = migrationsConfig.getString("package")
+  val migrationsDir = migrationsConfig.getString("directory")
 
   val driverClassName = migrationsConfig.getString("db.driver")
   val dbUrl = migrationsConfig.getString("db.url")
@@ -31,10 +34,11 @@ class DbMigrator(configFile: File, logger: Logger) {
   def createMigration(name: String): Boolean = {
     val now = LocalDateTime.now
     val creationDate: String = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
-    val migrationFileName: String = s"$migrationsDir/Migrate_${creationDate}_$name.cql"
+    val className: String = s"Migrate_${creationDate}_$name"
+    val migrationFileName: String = s"${migrationsDir}/${className}.scala"
     logger.info(s"Creating migration file: $migrationFileName")
     val migrationTemplate: String = s"""
-package com.imageworks.vnp.dao.migrations
+package ${migrationsPackage}
 
 import com.imageworks.migration.{Limit, Migration, Name, NotNull, OnDelete, Restrict, Unique}
 
@@ -42,7 +46,7 @@ import com.imageworks.migration.{Limit, Migration, Name, NotNull, OnDelete, Rest
  * authoredAt: ${System.currentTimeMillis}
  */
 
-class ${migrationFileName} extends Migration
+class ${className} extends Migration
 {
   def up() {
 
