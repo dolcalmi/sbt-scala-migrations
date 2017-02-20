@@ -4,7 +4,7 @@ import java.io.PrintWriter
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-import com.imageworks.migration.{Migrator, DatabaseAdapter, Vendor, ConnectionBuilder}
+import com.imageworks.migration._
 
 import com.typesafe.config.ConfigFactory
 import sbt.{Logger, _}
@@ -30,6 +30,35 @@ class DbMigrator(configFile: File, logger: Logger) {
   val connectionBuilder = new ConnectionBuilder(dbUrl, dbUser, dbPassword)
 
   val migrator = new Migrator(connectionBuilder, databaseAdapter)
+
+  Class.forName(driverClassName)
+  //Thread.currentThread().getContextClassLoader()
+
+  def migrate(version: Option[Long]): Boolean = {
+    if (version.isEmpty){
+      logger.info(s"Migrating...")
+      migrator.migrate(InstallAllMigrations, migrationsPackage, false)
+    } else {
+      logger.info(s"Migrating to version ${version}")
+      migrator.migrate(MigrateToVersion(version.get), migrationsPackage, false)
+    }
+    logger.success("Done!")
+    true
+  }
+
+  def rollback(count: Int = 1): Boolean = {
+    logger.info(s"Rollback ${count} migration(s)...")
+    migrator.migrate(RollbackMigration(count), migrationsPackage, false)
+    logger.success("Done!")
+    true
+  }
+
+  def reset(): Boolean = {
+    logger.info("Reseting database...")
+    migrator.migrate(RemoveAllMigrations, migrationsPackage, false)
+    logger.success("Done!")
+    true
+  }
 
   def createMigration(name: String): Boolean = {
     val now = LocalDateTime.now
@@ -65,14 +94,3 @@ class ${className} extends Migration
     true
   }
 }
-
-
-// database {
-//   driver = "slick.driver.MySQLDriver$"
-//   db {
-//     driver = "com.mysql.jdbc.Driver"
-//     url = "jdbc:mysql://localhost/coquito_dev?characterEncoding=utf8"
-//     user = "coquito_dev_user"
-//     password = "coquito_dev_p4ssw0rd"
-//   }
-// }
